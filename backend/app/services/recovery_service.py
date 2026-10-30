@@ -62,12 +62,34 @@ class RecoveryService:
             borrower.version += 1
             reaped_borrowers_count += 1
 
-        if reaped_agents_count > 0 or reaped_borrowers_count > 0:
+        # 3. Reap Stale Call Reservations (worker crashed after creating Call before carrier dispatch)
+        stale_calls = (
+            db.execute(
+                select(Call)
+                .where(
+                    Call.status == CallState.RESERVED.value,
+                    Call.reserved_at <= cutoff
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        reaped_calls_count = 0
+        for call in stale_calls:
+            call.status = CallState.FAILED.value
+            call.failure_reason = "WORKER_CRASH_BEFORE_DISPATCH: Stale reservation reaped"
+            call.completed_at = now
+            call.version += 1
+            reaped_calls_count += 1
+
+        if reaped_agents_count > 0 or reaped_borrowers_count > 0 or reaped_calls_count > 0:
             db.commit()
 
         return {
             "reaped_agents": reaped_agents_count,
-            "reaped_borrowers": reaped_borrowers_count
+            "reaped_borrowers": reaped_borrowers_count,
+            "reaped_calls": reaped_calls_count
         }
 
     @staticmethod

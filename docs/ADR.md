@@ -81,3 +81,26 @@ We implemented a shared `ITelecomProvider` interface with two implementations:
 - **Provider A (ReliableTelecom)**: 50–150ms latency, 98%+ reliability, clean event sequencing.
 - **Provider B (FlakyTelecom)**: 400–1500ms latency, 10% timeouts, duplicate `ANSWERED` events, and out-of-order `COMPLETED` webhooks.
 - **Circuit Breaker**: Each provider incorporates a 3-state circuit breaker (`CLOSED`, `OPEN`, `HALF_OPEN`). When rolling failure rate exceeds 40%, the circuit trips to `OPEN`, triggering Safety Controller fallback.
+
+
+---
+
+## ADR 005: Replacement of Arbitrary Overdial Multiplier with Binomial Upper Confidence Limit (UCL) Ceiling
+
+### Context
+Static overdial multipliers (such as an arbitrary $3.0\times$ capacity factor) are statistically indefensible in regulated collections environments:
+- When answer rate is high ($p = 0.70$), dialing $3.0\times$ capacity expects $2.1\times$ live answers, mathematically guaranteeing severe call abandonment.
+- When answer rate is low ($p = 0.15$), a $3.0\times$ multiplier yields only $0.45\times$ expected answers, artificially suppressing agent utilization.
+
+### Decision
+We replaced arbitrary static multipliers with an inverted **Binomial Upper Confidence Limit (UCL)** safety ceiling.
+Given expected capacity $C_{\text{target}} = A_{avail} + E[\text{freeing}]$ and target abandonment risk tolerance $\alpha = 0.01$ (1%), the Safety Controller bounds $P(\text{Answers} > C_{\text{target}}) \le \alpha$.
+Using the inverted Normal approximation to $B(N, p)$:
+$$C_{\text{target}} \ge N p + z_{1-\alpha} \sqrt{N p (1 - p)}$$
+Solving the quadratic in $u = \sqrt{N}$ yields the exact safe dialing ceiling:
+$$u_{\text{safe}} = \frac{-z_{1-\alpha} \sqrt{p(1-p)} + \sqrt{z_{1-\alpha}^2 p(1-p) + 4 p C_{\text{target}}}}{2p}$$
+$$N_{\text{safe}} = \max\left(A_{avail}, \lfloor u_{\text{safe}}^2 \rfloor\right)$$
+
+### Consequences
+- **Statistical Defensibility**: The ceiling automatically contracts when answer rates are high (preventing abandon spikes) and expands when answer rates are low (preserving utilization).
+- **Compliance Alignment**: Formally ensures the probability of call abandonment remains bounded under $1\%$.

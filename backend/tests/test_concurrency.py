@@ -11,7 +11,6 @@ def test_atomic_agent_reservation_race_condition():
     Test two concurrent workers attempting to reserve the exact same agent.
     Only ONE worker must succeed.
     """
-    # Create shared SQLite database with WAL and multi-thread support
     engine = create_engine("sqlite:///./concurrency_test.db", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
     Session = sessionmaker(bind=engine)
@@ -26,7 +25,6 @@ def test_atomic_agent_reservation_race_condition():
 
     def worker_attempt():
         with Session() as db:
-            # Both workers fetch initial agent state (version 1)
             agent = db.execute(select(Agent).where(Agent.id == 101)).scalar_one()
             success = AllocationService.reserve_agent_atomically(db, agent.id, agent.version)
             return success
@@ -36,7 +34,6 @@ def test_atomic_agent_reservation_race_condition():
         f2 = executor.submit(worker_attempt)
         results = [f1.result(), f2.result()]
 
-    # Exactly one True and one False
     assert results.count(True) == 1
     assert results.count(False) == 1
 
@@ -45,7 +42,6 @@ def test_atomic_agent_reservation_race_condition():
         assert final_agent.status == AgentState.RESERVED.value
         assert final_agent.version == 2
 
-    # Clean up test database
     import os
     try:
         os.remove("./concurrency_test.db")
@@ -123,7 +119,6 @@ def test_multi_worker_pool_allocation_no_double_reservation():
 
     successful_ids = [aid for aid in allocated_ids if aid is not None]
     
-    # Must have reserved all 3 agents with zero duplicates
     assert len(successful_ids) == 3
     assert len(set(successful_ids)) == 3
     assert set(successful_ids) == {201, 202, 203}
@@ -132,5 +127,43 @@ def test_multi_worker_pool_allocation_no_double_reservation():
     import os
     try:
         os.remove("./concurrency_pool_test.db")
+    except Exception:
+        pass
+
+def test_database_transaction_rollback_behaviour():
+    """
+    Verify database transaction rollback: when a worker encounters an optimistic lock conflict,
+    the transaction is rolled back cleanly without creating dirty reads or uncommitted state.
+    """
+    engine = create_engine("sqlite:///./concurrency_rollback_test.db", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine)
+
+    with Session() as db:
+        db.query(Agent).delete()
+        agent = Agent(id=301, name="RollbackAgent", status=AgentState.AVAILABLE.value, version=1)
+        db.add(agent)
+        db.commit()
+
+    # Worker 1 successfully updates version to 2
+    with Session() as db:
+        success = AllocationService.reserve_agent_atomically(db, agent_id=301, current_version=1)
+        assert success is True
+
+    # Worker 2 attempts with stale version 1 -> fails and rolls back
+    with Session() as db:
+        success = AllocationService.reserve_agent_atomically(db, agent_id=301, current_version=1)
+        assert success is False
+        db.rollback()
+
+    # Verify database state is consistent
+    with Session() as db:
+        final_agent = db.execute(select(Agent).where(Agent.id == 301)).scalar_one()
+        assert final_agent.status == AgentState.RESERVED.value
+        assert final_agent.version == 2
+
+    import os
+    try:
+        os.remove("./concurrency_rollback_test.db")
     except Exception:
         pass

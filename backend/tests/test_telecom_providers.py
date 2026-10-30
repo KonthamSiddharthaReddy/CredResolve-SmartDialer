@@ -85,3 +85,31 @@ def test_out_of_order_completed_before_answered(db_session):
     assert late_ans_res["status"] == "stale"
     assert call.status == CallState.COMPLETED.value
     assert agent.status == AgentState.WRAP_UP.value  # Agent is not reverted!
+
+
+def test_retry_idempotency_blocks_duplicate_dispatch(db_session):
+    from sqlalchemy.exc import IntegrityError
+    call1 = Call(
+        id=88,
+        idempotency_key="unique-idempotency-key-88",
+        campaign_id=1,
+        borrower_id=1,
+        provider_type=ProviderType.PROVIDER_A.value,
+        status=CallState.INITIATED.value
+    )
+    db_session.add(call1)
+    db_session.commit()
+
+    # Attempting to insert a duplicate call with the same idempotency key must raise IntegrityError
+    call2 = Call(
+        id=89,
+        idempotency_key="unique-idempotency-key-88",  # DUPLICATE KEY
+        campaign_id=1,
+        borrower_id=1,
+        provider_type=ProviderType.PROVIDER_A.value,
+        status=CallState.INITIATED.value
+    )
+    db_session.add(call2)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()

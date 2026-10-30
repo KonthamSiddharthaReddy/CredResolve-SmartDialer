@@ -279,10 +279,17 @@ class DialerWorker:
         # Agent bridging
         agent = None
         if call.agent_id:
-            agent = db.execute(select(Agent).where(Agent.id == call.agent_id)).scalar_one_or_none()
+            candidate = db.execute(select(Agent).where(Agent.id == call.agent_id)).scalar_one_or_none()
+            if candidate and AgentStateMachine.can_transition(AgentState(candidate.status), AgentState.CONNECTED):
+                agent = candidate
+            else:
+                # Agent disappeared during setup (logged off, went paused, or crashed)
+                # Decouple and attempt to dynamically rescue call with another available agent
+                call.agent_id = None
+                db.commit()
 
         if not agent:
-            # Speculative predictive call answered: locate an available agent
+            # Speculative predictive call answered or agent disappeared: locate an available agent
             agent = AllocationService.reserve_next_available_agent(db)
             if agent:
                 call.agent_id = agent.id

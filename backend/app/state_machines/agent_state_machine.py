@@ -15,7 +15,7 @@ class InvalidAgentStateTransitionException(Exception):
 VALID_AGENT_TRANSITIONS = {
     AgentState.OFFLINE: {AgentState.AVAILABLE, AgentState.PAUSED},
     AgentState.AVAILABLE: {AgentState.RESERVED, AgentState.PAUSED, AgentState.OFFLINE, AgentState.CONNECTED},
-    AgentState.RESERVED: {AgentState.DIALING, AgentState.AVAILABLE, AgentState.PAUSED, AgentState.OFFLINE},
+    AgentState.RESERVED: {AgentState.DIALING, AgentState.CONNECTED, AgentState.AVAILABLE, AgentState.PAUSED, AgentState.OFFLINE},
     AgentState.DIALING: {AgentState.CONNECTED, AgentState.AVAILABLE, AgentState.WRAP_UP, AgentState.OFFLINE},
     AgentState.CONNECTED: {AgentState.WRAP_UP, AgentState.AVAILABLE, AgentState.OFFLINE},
     AgentState.WRAP_UP: {AgentState.AVAILABLE, AgentState.PAUSED, AgentState.OFFLINE},

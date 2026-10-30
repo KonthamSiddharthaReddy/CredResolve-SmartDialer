@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 from backend.app.models.enums import DialingMode, SafetyDecisionType, CircuitState
@@ -20,16 +21,60 @@ class SafetyController:
     - Decides whether requested calls are APPROVED, REDUCED, REJECTED,
       or forced to FALLBACK_PROGRESSIVE.
     - Enforces regulatory compliance (0% abandoned calls target, max 1% threshold).
+    - Replaces arbitrary overdial multipliers with a statistically defensible
+      Binomial Upper Confidence Limit (UCL) safe dialing ceiling.
     """
     def __init__(
         self,
-        max_overdial_multiplier: float = 3.0,
         max_abandon_rate: float = 0.01,
         min_answer_rate_threshold: float = 0.10
     ):
-        self.max_overdial_multiplier = max_overdial_multiplier
         self.max_abandon_rate = max_abandon_rate
         self.min_answer_rate_threshold = min_answer_rate_threshold
+
+    @staticmethod
+    def calculate_binomial_safe_dialing_ceiling(
+        available_agents: int,
+        wrap_up_agents: int,
+        connected_calls: int,
+        answer_rate: float,
+        target_abandon_rate: float = 0.01,
+        talk_time_sec: float = 90.0,
+        ring_window_sec: float = 20.0
+    ) -> int:
+        """
+        Calculates the mathematically defensible maximum outbound calls to initiate
+        such that the probability of live answers exceeding agent capacity is bounded:
+            P(Answers > Capacity) <= target_abandon_rate (e.g. 1% regulatory threshold).
+        
+        Using the inverted Normal approximation to the Binomial distribution B(N, p):
+            Capacity >= N*p + z_{1-alpha} * sqrt(N * p * (1 - p))
+        Solving for N yields the upper safe dialing bound.
+        """
+        # Expected agents freeing up during ringing interval (Little's Law departure rate)
+        freeing_rate = max(0.0, connected_calls * (ring_window_sec / max(10.0, talk_time_sec)))
+        expected_wrap_release = wrap_up_agents * 0.8
+        total_capacity = float(available_agents) + freeing_rate + expected_wrap_release
+
+        if total_capacity <= 0.0:
+            return 0
+
+        p = max(0.05, min(0.95, answer_rate))
+        # z_{0.99} = 2.3263 corresponds to 99% confidence (1% abandon tolerance)
+        z = 2.3263 if target_abandon_rate <= 0.01 else 1.96
+
+        # Inverted quadratic equation: p*u^2 + z*sqrt(p*(1-p))*u - total_capacity = 0
+        term_b = z * math.sqrt(p * (1.0 - p))
+        discriminant = (term_b ** 2) + (4.0 * p * total_capacity)
+        
+        if discriminant < 0:
+            return available_agents
+
+        u = (-term_b + math.sqrt(discriminant)) / (2.0 * p)
+        n_safe = int(math.floor(u ** 2))
+
+        # Progressive floor guarantee: if available agents exist, at least allocate 1:1
+        return max(available_agents, n_safe)
 
     def evaluate(
         self,
@@ -194,11 +239,16 @@ class SafetyController:
                     metrics_snapshot=snapshot
                 )
 
-        # Predictive Mode Hard Maximum Ceiling
-        # Total in-flight cannot exceed multiplier of available + expected wrap-up
-        capacity_base = max(1.0, float(available_agents) + float(wrap_up_agents) + (0.4 * connected_calls))
-        hard_max_calls = int(capacity_base * self.max_overdial_multiplier)
-        net_max_to_dial = max(0, hard_max_calls - ringing_calls)
+        # Predictive Mode: Statistically Defensible Binomial Ceiling
+        # Enforces P(Live Answers > Agent Capacity) <= target_abandon_rate (1% threshold)
+        safe_dial_ceiling = SafetyController.calculate_binomial_safe_dialing_ceiling(
+            available_agents=available_agents,
+            wrap_up_agents=wrap_up_agents,
+            connected_calls=connected_calls,
+            answer_rate=current_answer_rate,
+            target_abandon_rate=self.max_abandon_rate
+        )
+        net_max_to_dial = max(0, safe_dial_ceiling - ringing_calls)
 
         if requested > net_max_to_dial:
             approved = net_max_to_dial
@@ -206,7 +256,10 @@ class SafetyController:
                 decision_type=SafetyDecisionType.REDUCED if approved > 0 else SafetyDecisionType.REJECTED,
                 approved_calls=approved,
                 requested_calls=requested,
-                rationale=f"Safety capacity cap: Reduced requested {requested} to {approved} (hard safety multiplier ceiling {self.max_overdial_multiplier}x).",
+                rationale=(
+                    f"Safety capacity cap: Reduced requested {requested} to {approved} "
+                    f"via Binomial UCL bound (P(abandon) <= {self.max_abandon_rate*100:.1f}%)."
+                ),
                 metrics_snapshot=snapshot
             )
 
