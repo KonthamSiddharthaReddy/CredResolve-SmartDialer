@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  smartdialer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: credresolve-smartdialer
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./smartdialer.db
+    volumes:
+      - dialer-data:/app
+    restart: unless-stopped
+
+volumes:
+  dialer-data:
