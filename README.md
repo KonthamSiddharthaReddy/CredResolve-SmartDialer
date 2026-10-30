@@ -21,7 +21,7 @@ In debt collection operations, agents spend significant time waiting for outboun
    - **Provider B**: High latency, timeouts, duplicate events, and out-of-order events.
    - Built-in **3-State Circuit Breakers** (`CLOSED`, `OPEN`, `HALF_OPEN`).
 5. **Interactive Fintech Dashboard**: High-density React + TypeScript interface visualizing agent states, real-time pacing math, active calls, scenario controls (A, B, C, D), and live chaos injection.
-6. **100% Automated Test Coverage**: 31 unit, concurrency, pacing, safety, and recovery tests passing via `pytest`.
+6. **Automated Test Coverage**: 39 comprehensive unit, concurrency, pacing, safety, and recovery tests passing via `pytest`.
 
 ---
 
@@ -241,6 +241,7 @@ While our Poisson departure model accounts for mean duration, extreme variance i
 
 ## 8. Documentation Index
 
+- [MY_ENGINEERING_NOTES.md](MY_ENGINEERING_NOTES.md): Candidate engineering notes, technical defense, and detailed trade-off analysis.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Full component diagrams, agent state machine, call state machine.
 - [docs/ADR.md](docs/ADR.md): Architecture Decision Records (Safety Controller, SQLite WAL vs Postgres, Little's Law).
 - [docs/FAILURES_AND_RECOVERY.md](docs/FAILURES_AND_RECOVERY.md): Comprehensive analysis of all 7 failure scenarios.

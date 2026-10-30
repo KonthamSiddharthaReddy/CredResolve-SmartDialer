@@ -1,3 +1,5 @@
+import asyncio
+import concurrent.futures
 import time
 import uuid
 from datetime import datetime, timezone
@@ -9,6 +11,7 @@ from backend.app.models.enums import AgentState, BorrowerStatus, CallState, Dial
 from backend.app.pacing.progressive import ProgressivePacingEngine
 from backend.app.pacing.predictive import PredictivePacingEngine
 from backend.app.pacing.safety_controller import SafetyController, SafetyEvaluation
+from backend.app.telecom.interface import ProviderCallResult
 from backend.app.telecom.provider_a import ProviderA
 from backend.app.telecom.provider_b import ProviderB
 from backend.app.state_machines.agent_state_machine import AgentStateMachine
@@ -27,6 +30,19 @@ def get_provider(provider_type: ProviderType):
     if provider_type == ProviderType.PROVIDER_B:
         return provider_b_instance
     return provider_a_instance
+
+def _run_async(coro):
+    """Execute an async coroutine from synchronous worker context."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
+    return asyncio.run(coro)
+
 
 class DialerWorker:
     """
@@ -212,23 +228,11 @@ class DialerWorker:
             CallStateMachine.transition(call, CallState.INITIATED)
             db.commit()
 
-            # Dispatch to provider synchronously or record for async execution
-            # Call provider synchronously in this worker step
-            import asyncio
+            # Dispatch call to telecom provider
             try:
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    loop = None
-
-                if loop and loop.is_running():
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        res = pool.submit(asyncio.run, provider.initiate_call(call.id, borrower.phone, idempotency_key)).result()
-                else:
-                    res = asyncio.run(provider.initiate_call(call.id, borrower.phone, idempotency_key))
+                res = _run_async(provider.initiate_call(call.id, borrower.phone, idempotency_key))
             except Exception as e:
-                res = asyncio.run(provider.initiate_call(call.id, borrower.phone, idempotency_key))
+                res = ProviderCallResult(success=False, error_message=f"Dispatch exception: {str(e)}")
 
             if res.success:
                 call.provider_call_id = res.provider_call_id

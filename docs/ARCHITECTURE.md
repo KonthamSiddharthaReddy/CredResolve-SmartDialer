@@ -165,4 +165,4 @@ The Safety Controller evaluates five orthogonal invariant layers before approvin
 2. **Circuit Breaker Check**: If telecom provider circuit is `OPEN` or `HALF_OPEN`, reject speculative calls or enforce strict progressive fallback.
 3. **Regulatory Abandonment Ceiling**: If recent abandoned calls $> 0$ or abandon rate $> 1.0\%$, immediately revert predictive mode to 1:1 progressive mode.
 4. **Answer Rate Collapse Protection**: If answer rate $< 10\%$, switch to progressive mode to avoid queue saturation and carrier spam score penalties.
-5. **Capacity Multiplier Cap**: Even during peak confidence, in-flight calls cannot exceed $A_{avail} \times \text{MAX\_OVERDIAL\_RATIO} + E[\text{freeing}]$.
+5. **Binomial UCL Capacity Ceiling**: Enforces $P(\text{Answers} > \text{Capacity}) \le \alpha$ (where $\alpha = 0.01$). Even during high model confidence, approved calls are clamped to this statistical ceiling to prevent over-subscription bursts.

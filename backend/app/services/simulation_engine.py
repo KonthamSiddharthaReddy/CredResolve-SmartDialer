@@ -1,3 +1,4 @@
+import math
 import random
 import time
 from datetime import datetime, timezone
@@ -178,7 +179,6 @@ class SimulationEngine:
         if self.current_scenario == "SCENARIO_D":
             self.scenario_d_step += 1
             # Wave modulation: answer rate fluctuates between 15% and 65%
-            import math
             wave = (math.sin(self.scenario_d_step * 0.15) + 1.0) / 2.0  # 0 to 1
             campaign.historical_answer_rate = 0.15 + (0.50 * wave)
             # Latency fluctuates between 100ms and 900ms
