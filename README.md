@@ -58,7 +58,21 @@ flowchart LR
 - Python 3.12+ (or [uv](https://docs.astral.sh/uv/))
 - Node.js 18+ & npm
 
-### Option A: Running with `uv` (Fastest)
+### Option A: One-Click Windows Launchers (Recommended for Windows 11)
+
+For Windows developers, full one-click batch automation scripts are provided at the root:
+
+| Script | Purpose |
+|---|---|
+| **`START_CREDRESOLVE.bat`** | Automatically verifies `uv`, `node`, `npm`, auto-creates `.venv` and installs dependencies if needed, starts FastAPI backend on port 8000, starts Vite frontend on port 3000 (or detects alternative port), launches the dashboard in default browser, and tracks process PIDs. |
+| **`STOP_CREDRESOLVE.bat`** | Safely shuts down both backend and frontend process trees using tracked PIDs and releases ports 8000 and 3000 without affecting unrelated applications. |
+| **`CHECK_CREDRESOLVE.bat`** | Runs non-intrusive environment and port diagnostics to verify system readiness and service health without launching duplicate processes. |
+
+**To launch:** Simply double-click `START_CREDRESOLVE.bat` in Windows Explorer (or run `.\START_CREDRESOLVE.bat` from terminal).
+
+---
+
+### Option B: Running with `uv` (Fastest CLI)
 
 ```bash
 # 1. Clone repository
@@ -82,7 +96,7 @@ Frontend Dashboard will open at: **[http://localhost:3000](http://localhost:3000
 
 ---
 
-### Option B: Running with Standard Python & Virtualenv
+### Option C: Running with Standard Python & Virtualenv
 
 ```bash
 # Create and activate virtual environment
@@ -98,7 +112,7 @@ python backend/run_server.py
 
 ---
 
-### Option C: Running with Docker Compose
+### Option D: Running with Docker Compose
 
 ```bash
 docker-compose up --build
@@ -115,7 +129,7 @@ Run the complete test suite with `pytest`:
 uv run pytest -v
 ```
 
-### Test Suite Coverage (31 Tests Passing):
+### Test Suite Coverage (39 Tests Passing - 100% Green):
 - **Agent & Call State Machines**: Strict state transitions, duplicate event idempotency, out-of-order event recovery.
 - **Progressive Dialing**: Zero overdial guarantees ($A_{avail} \ge C_{out}$).
 - **Predictive Pacing Engine**: Little's Law formula, freeing agent departure rates, statistical damping.
@@ -233,6 +247,7 @@ While our Poisson departure model accounts for mean duration, extreme variance i
 - [docs/SCALING_100_1000_10000.md](docs/SCALING_100_1000_10000.md): Distributed systems scaling bottlenecks and fixes.
 - [docs/FINAL_QUESTION.md](docs/FINAL_QUESTION.md): In-depth architectural answer to the prompt's final question.
 - [docs/API.md](docs/API.md): Full REST API specification with request/response schemas.
+- [docs/LOAD_TEST_RESULTS.md](docs/LOAD_TEST_RESULTS.md): Quantitative concurrent allocation stress-test benchmarks.
 
 ---
 
