@@ -10,57 +10,57 @@ The SmartDialer strictly enforces the architectural boundary specified in the Cr
 
 ```mermaid
 flowchart TD
-    subgraph Campaign Layer
-        CQ[Borrower Campaign Queue]
-        CM[Campaign Manager & Target Metrics]
+    subgraph Campaign_Layer ["Campaign Layer"]
+        CQ["Borrower Campaign Queue"]
+        CM["Campaign Manager & Target Metrics"]
     end
 
-    subgraph Pacing Layer
-        PE[Pacing Engine]
-        PROG[Progressive Logic: 1:1 Available]
-        PRED[Predictive Engine: Little's Law + Release Rates]
+    subgraph Pacing_Layer ["Pacing Layer"]
+        PE["Pacing Engine"]
+        PROG["Progressive Logic: 1:1 Available"]
+        PRED["Predictive Engine: Little's Law + Release Rates"]
         PE --> PROG
         PE --> PRED
     end
 
-    subgraph Autonomous Safety Layer
-        SC[Independent Safety Controller]
-        CB[Provider Circuit Breaker Check]
-        AB[Abandon Rate & Compliance Guard]
-        CG[Sudden Agent Drop Guard]
+    subgraph Autonomous_Safety_Layer ["Autonomous Safety Layer"]
+        SC["Independent Safety Controller"]
+        CB["Provider Circuit Breaker Check"]
+        AB["Abandon Rate & Compliance Guard"]
+        CG["Sudden Agent Drop Guard"]
         SC --> CB
         SC --> AB
         SC --> CG
     end
 
-    subgraph Execution & Concurrency Layer
-        CA[Call Allocator & Concurrency Service]
-        AGENT_LOCK[Atomic Agent Reservation: Optimistic Versioning]
-        BORROWER_LOCK[Atomic Borrower Reservation: Conditional Update]
+    subgraph Concurrency_Layer ["Execution & Concurrency Layer"]
+        CA["Call Allocator & Concurrency Service"]
+        AGENT_LOCK["Atomic Agent Reservation: Optimistic Versioning"]
+        BORROWER_LOCK["Atomic Borrower Reservation: Conditional Update"]
         CA --> AGENT_LOCK
         CA --> BORROWER_LOCK
     end
 
-    subgraph Telecom Mock Providers
-        TP[Provider Interface]
-        PA[Provider A: Fast & Reliable]
-        PB[Provider B: Flaky, Timeouts, Out-of-Order]
+    subgraph Telecom_Layer ["Telecom Mock Providers"]
+        TP["Provider Interface"]
+        PA["Provider A: Fast & Reliable"]
+        PB["Provider B: Flaky, Timeouts, Out-of-Order"]
         TP --> PA
         TP --> PB
     end
 
-    subgraph Crash Recovery & Resilience
-        REAP[Janitor Reaper: Stale Reservation TTL Sweeper]
-        CALL_REAP[Orphaned Call Timeout Reaper]
+    subgraph Recovery_Layer ["Crash Recovery & Resilience"]
+        REAP["Janitor Reaper: Stale Reservation TTL Sweeper"]
+        CALL_REAP["Orphaned Call Timeout Reaper"]
     end
 
     CQ --> PE
     CM --> PE
-    PE -->|Desired Calls Request| SC
-    SC -->|Approved / Clamped / Fallback Calls| CA
+    PE -->|"Desired Calls Request"| SC
+    SC -->|"Approved / Clamped / Fallback Calls"| CA
     CA --> TP
-    REAP -.->|Restores Stale Agents & Borrowers| CA
-    CALL_REAP -.->|Terminates Orphaned Calls| CA
+    REAP -.->|"Restores Stale Agents & Borrowers"| CA
+    CALL_REAP -.->|"Terminates Orphaned Calls"| CA
 ```
 
 ---
@@ -135,7 +135,7 @@ stateDiagram-v2
     RINGING --> COMPLETED: Out-of-Order Webhook
     
     ANSWERED --> CONNECTED: Bridged to Available Agent
-    ANSWERED --> FAILED: Abandoned (No Agent Available)
+    ANSWERED --> FAILED: Abandoned - No Agent Available
     ANSWERED --> COMPLETED: Immediate Hangup
     
     CONNECTED --> COMPLETED: Normal Call Termination

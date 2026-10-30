@@ -29,10 +29,10 @@ In debt collection operations, agents spend significant time waiting for outboun
 
 ```mermaid
 flowchart LR
-    Campaign[Campaign Queue] --> Pacing[Pacing Engine\n(Progressive / Predictive)]
-    Pacing -->|Desired Calls| Safety[Independent Safety Controller\n(Regulatory Guard & Circuit Breaker)]
-    Safety -->|Approved Calls| Allocator[Call Allocator\n(Atomic Locks & Idempotency)]
-    Allocator --> Provider[Telecom Provider\n(Provider A / Provider B)]
+    Campaign["Campaign Queue"] --> Pacing["Pacing Engine<br/>(Progressive / Predictive)"]
+    Pacing -->|"Desired Calls"| Safety["Independent Safety Controller<br/>(Regulatory Guard & Circuit Breaker)"]
+    Safety -->|"Approved Calls"| Allocator["Call Allocator<br/>(Atomic Locks & Idempotency)"]
+    Allocator --> Provider["Telecom Provider<br/>(Provider A / Provider B)"]
 ```
 
 > [!IMPORTANT]
